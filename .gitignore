@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+
+# Datos crudos recolectados
+data/raw/*
+!data/raw/.gitkeep
+
+# Modelos entrenados
+artifacts/*.pkl
+!artifacts/.gitkeep
