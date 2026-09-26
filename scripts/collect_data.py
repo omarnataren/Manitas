@@ -38,7 +38,7 @@ async def _record(label: str) -> None:
 
 
 def main() -> None:
-    label = input("Etiqueta de la seña a grabar (ej. 'hola'): ").strip()
+    label = input("Etiqueta de la seña a grabar (a'): ").strip()
     if not label:
         print("Etiqueta vacía, abortando.")
         return
