@@ -11,7 +11,10 @@ env/
 # Datos crudos recolectados
 data/raw/*
 !data/raw/.gitkeep
+data/vision/
+data/external/
 
-# Modelos entrenados
+# Modelos entrenados y descargados
 artifacts/*.pkl
+artifacts/*.task
 !artifacts/.gitkeep
