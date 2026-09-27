@@ -34,11 +34,30 @@ class SignClassifier:
         return label, float(proba[idx])
 
     def save(self, path: Path) -> None:
-        joblib.dump({"backend": self.backend, "label_encoder": self.label_encoder}, path)
+        from shared import config
+
+        joblib.dump(
+            {
+                "backend": self.backend,
+                "label_encoder": self.label_encoder,
+                "num_features": config.NUM_FEATURES,
+                "window_size": config.WINDOW_SIZE,
+                "labels": list(self.label_encoder.classes_),
+            },
+            path,
+        )
 
     @classmethod
     def load(cls, path: Path) -> "SignClassifier":
+        from shared import config
+
         payload = joblib.load(path)
+        saved_features = payload.get("num_features")
+        if saved_features is not None and saved_features != config.NUM_FEATURES:
+            raise ValueError(
+                f"Modelo entrenado con {saved_features} columnas pero config pide "
+                f"{config.NUM_FEATURES}. Reentrena con scripts/train_rf.py."
+            )
         obj = cls(backend=payload["backend"])
         obj.label_encoder = payload["label_encoder"]
         return obj

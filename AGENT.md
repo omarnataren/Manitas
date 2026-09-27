@@ -7,15 +7,16 @@ Pipeline: ESP32 por BLE → ventana deslizante → RandomForest → texto → vo
 
 - `DEVICE_NAME = "GuanteLSM"` — no cambiar sin actualizar ambos lados.
 - `CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"` con `PROPERTY_NOTIFY`.
-- Formato: CSV de 6 floats por notificación: `[izq, der, arr, abj, giro_izq, giro_der]`.
+- Formato: CSV de 11 floats por notificación: `[izq, der, arr, abj, giro_izq, giro_der, pulgar, indice, medio, anular, menique]`.
+- Dedos en escala 1-3: 1 = muy flexionado, 3 = nada flexionado.
 - Frecuencia aproximada: cada ~20 ms.
 - Regla: el ESP32 (Arduino) y Python (`bleak`) deben coincidir exactamente en nombre + UUID. Fuera de eso son independientes.
 
 ## 2. Ventana y features (fuente de verdad: `shared/config.py`)
 
-- `FEATURE_NAMES = ["izq", "der", "arr", "abj", "giro_izq", "giro_der"]`, `NUM_FEATURES = 6`.
+- `FEATURE_NAMES = ["izq", "der", "arr", "abj", "giro_izq", "giro_der", "pulgar", "indice", "medio", "anular", "menique"]`, `NUM_FEATURES = 11`.
 - `WINDOW_SIZE = 60` (60 muestras × ~20 ms ≈ 1200 ms por ventana).
-- `window (60,6) → vector (360,)` vía `src/features.py:window_to_vector()` (flatten para RandomForest).
+- `window (60,11) → vector (660,)` vía `src/features.py:window_to_vector()` (flatten para RandomForest).
 - Si se migra a modelo secuencial (BiLSTM/GRU), usar la ventana sin aplanar; no tocar recolección ni loop en vivo.
 
 ## 3. Estructura del repo

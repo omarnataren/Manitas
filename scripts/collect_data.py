@@ -13,35 +13,72 @@ poder ajustar tamaño de ventana/solapamiento sin volver a recolectar datos.
 import asyncio
 import csv
 import sys
+import time
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
+from shared import config  # noqa: E402
 from shared.ble_client import GloveBLEClient  # noqa: E402
 from src import dataset  # noqa: E402
 
 
 async def _record(label: str) -> None:
+    # La ruta se calcula ahora pero el archivo solo se crea al llegar
+    # la primera muestra válida (o sea, ya conectado al ESP32).
+    # Así los intentos fallidos de conexión no dejan CSVs vacíos.
     path = dataset.new_recording_path(label)
-    print(f"Grabando en {path}")
+    print(f"Destino: {path}")
     print("Mantén la seña sostenida y presiona Ctrl+C para terminar esta grabación.\n")
+    count = 0
+    f = None
+    writer = None
+    t0 = None
 
-    with open(path, "w", newline="") as f:
-        writer = csv.writer(f)
+    def on_sample(valores):
+        nonlocal count, f, writer, t0
+        if f is None:
+            f = open(path, "w", newline="")
+            writer = csv.writer(f)
+            t0 = time.monotonic()
+            print(f"Conectado, grabando en {path}")
+        count += 1
+        print(f"[{count}] {valores}")
+        writer.writerow(valores)
+        f.flush()
+        if count % 50 == 0:
+            rate = count / max(time.monotonic() - t0, 1e-6)
+            print(f"  ... {count} muestras ({rate:.0f}/s, esperado ~50/s)")
 
-        def on_sample(valores):
-            writer.writerow(valores)
-            f.flush()
-
-        client = GloveBLEClient(on_sample=on_sample)
+    client = GloveBLEClient(on_sample=on_sample)
+    try:
         await client.run()
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
+    finally:
+        if f is None:
+            print("\nNo se creó ningún archivo: no llegó ninguna muestra (¿falló la conexión?).")
+            # Limpia el directorio de la etiqueta si quedó vacío.
+            try:
+                path.parent.rmdir()
+            except OSError:
+                pass
+            return
+        f.flush()
+        f.close()
+        print(f"\nGrabación cerrada: {count} muestras guardadas en {path}")
+        if count < config.WINDOW_SIZE:
+            print(f"AVISO: solo {count} muestras; se necesitan >={config.WINDOW_SIZE} para una ventana.")
 
 
 def main() -> None:
-    label = input("Etiqueta de la seña a grabar (a'): ").strip()
+    label = input("Etiqueta de la seña a grabar: ").strip().lower()
     if not label:
         print("Etiqueta vacía, abortando.")
         return
+    if label not in config.SIGN_LABELS:
+        print(f"AVISO: '{label}' no está en SIGN_LABELS {config.SIGN_LABELS}.")
+        print("Se grabará igual, pero considera agregarla en shared/config.py.")
 
     try:
         asyncio.run(_record(label))

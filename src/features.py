@@ -4,7 +4,7 @@ from shared import config
 
 
 def window_to_vector(window: np.ndarray) -> np.ndarray:
-    """(WINDOW_SIZE, NUM_FEATURES) -> vector plano de 120 features para el
+    """(WINDOW_SIZE, NUM_FEATURES) -> vector plano para el
     baseline de RandomForest (que no modela orden temporal explícito).
 
     Si más adelante se pasa a un modelo secuencial (BiLSTM/GRU), ese modelo
