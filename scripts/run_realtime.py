@@ -70,7 +70,7 @@ async def main() -> None:
             most_common != last_spoken or now - last_spoken_time > REANNOUNCE_SECONDS
         ):
             print(f"--> Seña reconocida: {most_common} ({confidence:.0%})")
-            tts.speak(most_common)
+            tts.say_label(most_common)  # no bloquea; "reposo" no se dice
             last_spoken = most_common
             last_spoken_time = now
 

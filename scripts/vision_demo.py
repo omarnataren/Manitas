@@ -6,6 +6,7 @@ No necesita el guante ni guarda nada. La letra sale de:
 
     python scripts/vision_demo.py            # Q para salir
     python scripts/vision_demo.py --camera 1 # si tienes otra cámara
+    python scripts/vision_demo.py --sin-voz  # no decir la letra en voz alta
 """
 
 import argparse
@@ -20,7 +21,7 @@ import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 
 from shared import config  # noqa: E402
-from src import letter_rules, vision_features  # noqa: E402
+from src import letter_rules, tts, vision_features  # noqa: E402
 from src.model import SignClassifier  # noqa: E402
 from src.vision import HandTracker, draw_hand, draw_hand_box, should_quit  # noqa: E402
 
@@ -29,6 +30,7 @@ TEACHER_PATH = config.ARTIFACTS_DIR / "vision_teacher.pkl"
 PANEL_WIDTH = 280
 VOTE_FRAMES = 8
 CONFIDENCE_THRESHOLD = 0.6
+RESET_FRAMES = 30  # cuadros sin letra (~1 s) para poder volver a decir la misma letra
 FINGER_ORDER = ["pulgar", "indice", "medio", "anular", "menique"]
 
 
@@ -64,6 +66,7 @@ def draw_panel(height: int, letter, source: str, detail: str, fingers, orientati
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--camera", type=int, default=0)
+    parser.add_argument("--sin-voz", action="store_true", help="no decir la letra en voz alta")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(args.camera)
@@ -78,6 +81,7 @@ def main() -> None:
     tracker = HandTracker()
     recent: deque = deque(maxlen=VOTE_FRAMES)
     last_ts, prev_time, fps = -1, time.monotonic(), 0.0
+    last_spoken, none_streak = None, 0
 
     try:
         while True:
@@ -113,6 +117,14 @@ def main() -> None:
 
             top, count = Counter(recent).most_common(1)[0]
             letter = top if top and count >= VOTE_FRAMES * 0.75 else None
+            # Se dice cada letra nueva una vez; la misma se repite solo tras perderla ~1 s.
+            none_streak = none_streak + 1 if letter is None else 0
+            if none_streak >= RESET_FRAMES:
+                last_spoken = None
+            if letter and letter != last_spoken:
+                if not args.sin_voz:
+                    tts.say_label(letter)
+                last_spoken = letter
 
             now = time.monotonic()
             fps = 0.9 * fps + 0.1 / max(now - prev_time, 1e-6)

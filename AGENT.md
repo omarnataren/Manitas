@@ -27,7 +27,7 @@ shared/ble_client.py   # GloveBLEClient: BLE + parseo CSV + ventana deslizante
 src/features.py        # ventana -> vector
 src/dataset.py         # data/raw/<seña>/*.csv -> ventanas con solapamiento (step = WINDOW_SIZE//2)
 src/model.py           # SignClassifier: train/predict/save/load (backend RF actual)
-src/tts.py             # texto a voz offline (pyttsx3)
+src/tts.py             # voz es-MX offline, no bloqueante: say (macOS) / pyttsx3 (Win/Linux)
 scripts/collect_data.py # graba CSV crudo etiquetado (una corrida = una grabación)
 scripts/train_rf.py     # entrena baseline + métricas + guarda artifacts/model_rf.pkl
 scripts/run_realtime.py # inferencia viva con voto + voz
@@ -62,7 +62,7 @@ python scripts/run_realtime.py  # requiere artifacts/model_rf.pkl
 - `train_rf.py` exige ≥2 grabaciones por clase para evaluar y ≥3 para CV. Reporta: conteo ventanas/grabaciones por clase, classification report, matriz de confusión, accuracy CV.
 - Criterio RF → BiLSTM (ver README): CV alta y estable = RF basta; CV baja que sube con más datos = falta data; confusión entre señas que difieren en movimiento (no postura) = pasar a secuencial.
 - Recolección: varias grabaciones cortas por seña (ideal multi-persona), empezar ya con la seña hecha (la transición desde reposo mete ruido), incluir clase `reposo`.
-- Tiempo real (`run_realtime.py`): umbral confianza 60%, voto de 5 ventanas consecutivas iguales antes de hablar, no repetir la última seña ya anunciada.
+- Tiempo real (`run_realtime.py`): umbral confianza 60%, voto de 5 ventanas consecutivas iguales antes de hablar, no repetir la última seña ya anunciada. La voz usa `tts.say_label()` (no bloquea el loop BLE; omite `SILENT_LABELS` como `reposo`; pronunciación en `SPOKEN_TEXT` de `shared/config.py`).
 
 ## 7. Qué NO hacer
 

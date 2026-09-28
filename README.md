@@ -34,7 +34,7 @@ src/
   features.py       # ventana (60,11) -> vector (660,) para RandomForest
   dataset.py        # lee data/raw/<seña>/*.csv y lo corta en ventanas con solapamiento
   model.py          # SignClassifier: interfaz train/predict/save/load (backend intercambiable)
-  tts.py            # texto a voz offline (pyttsx3)
+  tts.py            # voz offline en español de México (say en macOS, pyttsx3 en otros), sin bloquear
 scripts/
   collect_data.py   # graba datos crudos etiquetados desde el guante
   train_rf.py       # entrena baseline RandomForest + métricas para evaluar el dataset
@@ -69,6 +69,16 @@ python scripts/train_rf.py
 # 3. Reconocimiento en vivo
 python scripts/run_realtime.py
 ```
+
+### Voz
+
+La seña o letra reconocida se muestra en pantalla y además se dice en voz alta en español de México, sin internet (`src/tts.py`):
+
+- **macOS:** usa el comando `say` con la voz `Paulina` (es_MX). Prueba: `say -v Paulina "por favor"`. Para ver otras voces: `say -v '?' | grep es_MX`.
+- **Windows / Linux:** usa `pyttsx3` y elige sola la primera voz `es-MX`, `es-419` o `es` instalada. En Windows instala el paquete de voz "Español (México)" en Configuración > Hora e idioma > Voz. En Linux: `sudo apt install espeak-ng`.
+- La voz corre en un hilo aparte: no frena el BLE ni la cámara, y si llegan varias señas mientras habla solo dice la más reciente.
+- Se configura en `shared/config.py`: `TTS_VOICE`, `TTS_RATE`, `SILENT_LABELS` (no se dicen, p. ej. `reposo`) y `SPOKEN_TEXT` (cómo se pronuncia cada etiqueta, p. ej. `por_favor` → "por favor", `y` → "i griega").
+- En `vision_demo.py` se puede apagar con `--sin-voz`.
 
 ### Tips de recolección
 
