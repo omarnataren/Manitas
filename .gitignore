@@ -12,9 +12,13 @@ env/
 data/raw/*
 !data/raw/.gitkeep
 data/vision/
+data/vision_dynamic/
 data/external/
+data/processed/
 
 # Modelos entrenados y descargados
-artifacts/*.pkl
-artifacts/*.task
-!artifacts/.gitkeep
+models/*
+!models/.gitkeep
+
+# Métricas de cada entrenamiento (se regeneran)
+experiments/
