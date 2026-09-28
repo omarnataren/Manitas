@@ -9,19 +9,19 @@ import numpy as np
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
 
-from shared import config
+from config import settings
 
 MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/hand_landmarker/"
     "hand_landmarker/float16/latest/hand_landmarker.task"
 )
-MODEL_PATH = config.ARTIFACTS_DIR / "hand_landmarker.task"
+MODEL_PATH = settings.MODELS_DIR / "vision" / "hand_landmarker.task"
 
 
 def ensure_model():
     if not MODEL_PATH.exists():
         print("Descargando modelo de MediaPipe (~8 MB)...")
-        config.ARTIFACTS_DIR.mkdir(exist_ok=True)
+        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
         tmp = MODEL_PATH.with_suffix(".part")
         try:
             urllib.request.urlretrieve(MODEL_URL, tmp)

@@ -1,83 +1,63 @@
 import asyncio
-from collections import deque
-from typing import Callable, Optional
+import time
+from typing import Callable
 
-import numpy as np
 from bleak import BleakClient, BleakScanner
 
-from . import config
+from config import settings
+
+SampleCallback = Callable[[int, list[float]], None]  # (timestamp_ms, valores)
 
 
-class GloveBLEClient:
-    """Conecta con el guante por BLE y mantiene una ventana deslizante de muestras.
+class GloveBLEReader:
+    """Conecta con el guante por BLE y entrega cada lectura válida a on_sample.
 
-    - on_sample(valores: list[float]) se dispara con cada muestra cruda que llega.
-    - on_window(window: np.ndarray) se dispara cuando la ventana está llena,
-      con shape (config.WINDOW_SIZE, config.NUM_FEATURES).
-
-    Se reutiliza tanto en scripts/collect_data.py (solo necesita on_sample)
-    como en scripts/run_realtime.py (solo necesita on_window).
+    No arma ventanas ni guarda archivos: eso es trabajo de quien lo usa
+    (captura de muestras o inferencia en vivo). Reconecta solo si se cae.
     """
 
-    def __init__(
-        self,
-        on_window: Optional[Callable[[np.ndarray], None]] = None,
-        on_sample: Optional[Callable[[list], None]] = None,
-    ):
-        self._buffer = deque(maxlen=config.WINDOW_SIZE)
-        self._on_window = on_window
+    def __init__(self, on_sample: SampleCallback, verbose: bool = False):
         self._on_sample = on_sample
+        self._verbose = verbose
+        self._count = 0
+        self.dropped = 0
 
     def _handle_notification(self, _sender, data: bytearray) -> None:
-        self._notif_count = getattr(self, "_notif_count", 0) + 1
+        self._count += 1
+        t_ms = int(time.time() * 1000)
         try:
             raw = data.decode("utf-8").strip()
-        except UnicodeDecodeError:
-            print(f"[BLE #{self._notif_count}] trama no UTF-8, descartada: {bytes(data)!r}")
-            return
-        print(f"[BLE #{self._notif_count}] raw: {raw!r}")
-        try:
             valores = [float(x) for x in raw.split(",")]
-        except ValueError:
-            print(f"[BLE #{self._notif_count}] no se pudo parsear a floats, descartada")
-            return  # trama incompleta o ruido en la transmisión
-
-        if len(valores) != config.NUM_FEATURES:
-            print(
-                f"[BLE #{self._notif_count}] se esperaban {config.NUM_FEATURES} valores "
-                f"pero llegaron {len(valores)}: {valores} (descartada)"
-            )
+        except (UnicodeDecodeError, ValueError):
+            self.dropped += 1
+            if self._verbose:
+                print(f"[BLE #{self._count}] trama inválida, descartada: {bytes(data)!r}")
             return
 
-        if self._on_sample:
-            self._on_sample(valores)
+        if len(valores) != settings.NUM_FEATURES:
+            self.dropped += 1
+            if self._verbose:
+                print(f"[BLE #{self._count}] {len(valores)} valores (se esperaban {settings.NUM_FEATURES}): {raw!r}")
+            return
 
-        if self._on_window:
-            self._buffer.append(valores)
-            if len(self._buffer) == config.WINDOW_SIZE:
-                self._on_window(np.array(self._buffer))
+        if self._verbose:
+            print(f"[BLE #{self._count}] {raw}")
+        self._on_sample(t_ms, valores)
 
     async def run(self) -> None:
-        """Escanea, conecta y captura hasta Ctrl+C.
-
-        Reconecta solo ante caídas o si el ESP32 no aparece al inicio:
-        la captura (y el archivo en collect_data) sobrevive a los cortes.
-        """
+        """Escanea, conecta y recibe hasta Ctrl+C. Reconecta ante caídas."""
         scan_fails = 0
         while True:
             try:
-                print(f"Buscando dispositivo '{config.DEVICE_NAME}'...")
-                device = await BleakScanner.find_device_by_name(config.DEVICE_NAME, timeout=10.0)
-
+                print(f"Buscando dispositivo '{settings.DEVICE_NAME}'...")
+                device = await BleakScanner.find_device_by_name(settings.DEVICE_NAME, timeout=10.0)
                 if not device:
                     scan_fails += 1
-                    print(f"No se encontró '{config.DEVICE_NAME}' (intento {scan_fails}).")
+                    print(f"No se encontró '{settings.DEVICE_NAME}' (intento {scan_fails}).")
                     if scan_fails == 3:
                         print(
-                            "Revisa: 1) ESP32 encendido y con batería, "
-                            "2) cerca de esta laptop (<3m), "
-                            "3) no conectado a otra laptop/celular, "
-                            "4) reinicia el ESP32 con el botón RST."
+                            "Revisa: 1) ESP32 encendido y con batería, 2) cerca de esta laptop (<3 m), "
+                            "3) no conectado a otra laptop/celular, 4) reinicia el ESP32 con RST."
                         )
                     await asyncio.sleep(2.0)
                     continue
@@ -85,21 +65,15 @@ class GloveBLEClient:
 
                 print(f"Encontrado ({device.address}). Conectando...")
                 disconnected = asyncio.Event()
-                try:
-                    async with BleakClient(
-                        device.address,
-                        timeout=15.0,
-                        disconnected_callback=lambda _c: disconnected.set(),
-                    ) as client:
-                        print("Conectado. Suscribiendo notificaciones...")
-                        await client.start_notify(config.CHARACTERISTIC_UUID, self._handle_notification)
-                        print("¡Conexión BLE activa! (Ctrl+C para detener)\n")
-                        await disconnected.wait()
-                        print("\nSe perdió la conexión con el ESP32, reconectando...")
-                except (KeyboardInterrupt, asyncio.CancelledError):
-                    raise
+                async with BleakClient(
+                    device.address, timeout=15.0, disconnected_callback=lambda _c: disconnected.set()
+                ) as client:
+                    await client.start_notify(settings.CHARACTERISTIC_UUID, self._handle_notification)
+                    print("Conexión BLE activa (Ctrl+C para detener).\n")
+                    await disconnected.wait()
+                    print("\nSe perdió la conexión con el ESP32, reconectando...")
             except (KeyboardInterrupt, asyncio.CancelledError):
                 raise
             except Exception as e:
-                print(f"Error BLE ({type(e).__name__}): {e}. Reintentando en 3s...")
+                print(f"Error BLE ({type(e).__name__}): {e}. Reintentando en 3 s...")
                 await asyncio.sleep(3.0)

@@ -32,15 +32,15 @@ from sklearn.pipeline import make_pipeline  # noqa: E402
 from sklearn.preprocessing import LabelEncoder, StandardScaler  # noqa: E402
 from sklearn.svm import SVC  # noqa: E402
 
-from shared import config  # noqa: E402
-from src import vision_features  # noqa: E402
-from src.model import SignClassifier  # noqa: E402
-from src.vision import HandTracker, draw_hand, should_quit  # noqa: E402
+from config import settings  # noqa: E402
+from src.vision import features as vision_features  # noqa: E402
+from src.vision.classifier import SignClassifier  # noqa: E402
+from src.vision.tracker import HandTracker, draw_hand, should_quit  # noqa: E402
 
 WINDOW = "Manitas - vision"
 
-VISION_DATA_DIR = config.ROOT_DIR / "data" / "vision"
-MODEL_PATH = config.ARTIFACTS_DIR / "vision_teacher.pkl"
+VISION_DATA_DIR = settings.VISION_DATA_DIR
+MODEL_PATH = settings.MODELS_DIR / "vision" / "teacher.pkl"
 HEADER = vision_features.CSV_HEADER
 
 CONFIDENCE_THRESHOLD = 0.6
@@ -223,7 +223,7 @@ def train(model_name: str = "rf", compare: bool = False) -> None:
     # El modelo que se guarda se entrena con todos los datos; la evaluación de arriba es solo para medir.
     clf = SignClassifier(backend=make_backend(model_name))
     clf.train(X, y)
-    config.ARTIFACTS_DIR.mkdir(exist_ok=True)
+    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     clf.save(MODEL_PATH)
     print(f"\nModelo guardado en {MODEL_PATH}")
 

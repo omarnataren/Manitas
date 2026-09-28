@@ -1,7 +1,7 @@
 """Demo de MediaPipe: abre la webcam, dibuja la mano y muestra la letra en un panel lateral.
 
 No necesita el guante ni guarda nada. La letra sale de:
-- el modelo entrenado con vision_teacher.py (artifacts/vision_teacher.pkl), si existe;
+- el modelo entrenado con vision_teacher.py (models/vision/teacher.pkl), si existe;
 - si no, reglas simples según qué dedos están estirados (A, B, D, I, L, U, V, W, Y).
 
     python scripts/vision_demo.py            # Q para salir
@@ -19,13 +19,14 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 
-from shared import config  # noqa: E402
-from src import letter_rules, vision_features  # noqa: E402
-from src.model import SignClassifier  # noqa: E402
-from src.vision import HandTracker, draw_hand, draw_hand_box, should_quit  # noqa: E402
+from config import settings  # noqa: E402
+from src.vision import features as vision_features  # noqa: E402
+from src.vision import letter_rules  # noqa: E402
+from src.vision.classifier import SignClassifier  # noqa: E402
+from src.vision.tracker import HandTracker, draw_hand, draw_hand_box, should_quit  # noqa: E402
 
 WINDOW = "Manitas - demo MediaPipe"
-TEACHER_PATH = config.ARTIFACTS_DIR / "vision_teacher.pkl"
+TEACHER_PATH = settings.MODELS_DIR / "vision" / "teacher.pkl"
 PANEL_WIDTH = 280
 VOTE_FRAMES = 8
 CONFIDENCE_THRESHOLD = 0.6
