@@ -40,6 +40,25 @@ MIN_CONFIDENCE = 0.80
 CONFIRM_WINDOWS = 3  # predicciones seguidas iguales para confirmar una seña
 COOLDOWN_MS = 500  # tiempo mínimo entre dos señas confirmadas
 
+# --- Voz (src/inference/tts.py) ---
+# macOS usa el comando `say` con esta voz (es_MX). Lista las voces con: say -v '?'
+# En Windows/Linux se usa pyttsx3 y se busca automáticamente una voz es-MX / es-419 / es.
+# Las etiquetas de NON_SIGN_LABELS (reposo, transicion) no se dicen.
+TTS_VOICE = "Paulina"
+TTS_LANG = "es_MX"
+TTS_RATE = 180  # palabras por minuto
+
+# Cómo se pronuncia cada etiqueta. Si no está aquí se dice la etiqueta con "_" -> " ".
+# Las letras sueltas se escriben con su nombre: el TTS lee "y" como conjunción, etc.
+SPOKEN_TEXT = {
+    "por_favor": "por favor",
+    "a": "a", "b": "be", "c": "ce", "d": "de", "e": "e", "f": "efe", "g": "ge",
+    "h": "hache", "i": "i", "j": "jota", "k": "ka", "l": "ele", "m": "eme",
+    "n": "ene", "ñ": "eñe", "o": "o", "p": "pe", "q": "cu", "r": "erre",
+    "s": "ese", "t": "te", "u": "u", "v": "ve", "w": "doble u", "x": "equis",
+    "y": "i griega", "z": "zeta",
+}
+
 # --- WebSocket ---
 WS_HOST = "0.0.0.0"
 WS_PORT = 8765

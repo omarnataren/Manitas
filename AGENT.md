@@ -38,7 +38,7 @@ src/training/evaluate.py        # métricas por ventana, muestra y persona; guar
 src/inference/predictor.py      # LivePredictor(model_dir).push(valores)
 src/inference/state_machine.py  # REPOSO -> CANDIDATO -> BLOQUEADO
 src/inference/ws_server.py      # SignBroadcaster (websockets), puerto WS_PORT
-src/inference/tts.py            # pyttsx3
+src/inference/tts.py            # voz es-MX no bloqueante: say (macOS) / pyttsx3 (Win/Linux); say_label() omite NON_SIGN_LABELS
 src/vision/                     # maestro de visión (MediaPipe): tracker, features, classifier, letter_rules,
                                 #   sequence (letras con movimiento, ventana 2 s a 15 cuadros/s), teacher_data
 scripts/                        # un script por paso del pipeline (ver README)

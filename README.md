@@ -59,7 +59,7 @@ src/
     predictor.py             # ventana deslizante + modelo
     state_machine.py         # REPOSO → CANDIDATO → BLOQUEADO: evita "HOLA HOLA HOLA"
     ws_server.py             # WebSocket que publica predicciones y señas confirmadas
-    tts.py                   # texto a voz offline
+    tts.py                   # voz offline en español de México, sin bloquear (say en macOS, pyttsx3 en otros)
   vision/                    # maestro de visión artificial (MediaPipe), ver abajo
 
 scripts/
@@ -133,6 +133,15 @@ python scripts/run_realtime.py --replay data/raw/p02 --no-tts   # probar sin gua
 ```
 
 `prediction` llega ~10 veces por segundo, para mostrar en vivo qué ve el modelo; `sign` llega solo cuando se confirma una seña.
+
+### Voz
+
+Las señas confirmadas (`run_realtime.py`) y las letras confirmadas (`vision_demo.py`) se muestran en pantalla y además se dicen en voz alta en español de México, sin internet (`src/inference/tts.py`). Se apaga con `--no-tts`.
+
+- **macOS:** usa el comando `say` con la voz `Paulina` (es_MX). Prueba: `say -v Paulina "por favor"`. Otras voces: `say -v '?' | grep es_MX`.
+- **Windows / Linux:** usa `pyttsx3` y elige sola la primera voz `es-MX`, `es-419` o `es` instalada. En Windows instala el paquete de voz "Español (México)" en Configuración > Hora e idioma > Voz. En Linux: `sudo apt install espeak-ng`.
+- La voz corre en un hilo aparte: no frena el BLE ni la cámara, y si llegan varias señas mientras habla solo dice la más reciente.
+- Se configura en `config/settings.py`: `TTS_VOICE`, `TTS_RATE` y `SPOKEN_TEXT` (cómo se pronuncia cada etiqueta, p. ej. `por_favor` → "por favor", `y` → "i griega"). Las de `NON_SIGN_LABELS` (`reposo`, `transicion`) nunca se dicen.
 
 ## Visión artificial (MediaPipe)
 

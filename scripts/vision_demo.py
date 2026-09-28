@@ -12,6 +12,7 @@ Cuándo se confirma una letra (ver src/vision/letter_state.py):
 
     python scripts/vision_demo.py              # Q o Esc salir, C borrar texto, Backspace borrar letra
     python scripts/vision_demo.py --camera 1
+    python scripts/vision_demo.py --no-tts     # sin voz (por defecto dice cada letra confirmada)
     python scripts/vision_demo.py --min-conf 0.3 --enhance contraste   # manos difíciles (guante negro); E cambia el realce
     python scripts/vision_demo.py --video ~/Downloads/MSL-dynamic-signs/test          # carpeta de videos
     python scripts/vision_demo.py --video mi_video.mov                                # un video tuyo
@@ -30,6 +31,7 @@ import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 
 from config import settings  # noqa: E402
+from src.inference import tts  # noqa: E402
 from src.vision import features as vision_features  # noqa: E402
 from src.vision import letter_rules  # noqa: E402
 from src.vision.classifier import SignClassifier  # noqa: E402
@@ -168,6 +170,7 @@ def main() -> None:
     parser.add_argument("--min-conf", type=float, default=0.5, help="umbral de MediaPipe (default 0.5; ~0.3 para guante)")
     parser.add_argument("--enhance", choices=ENHANCE_MODES, default="ninguno", help="realce de imagen (tecla E lo cambia)")
     parser.add_argument("--resolution", help="resolución de la webcam, ej. 1280x720")
+    parser.add_argument("--no-tts", action="store_true", help="sin voz")
     args = parser.parse_args()
     width, height = (int(v) for v in args.resolution.lower().split("x")) if args.resolution else (None, None)
     source = video_frames(args.video) if args.video else camera_frames(args.camera, width, height)
@@ -228,6 +231,8 @@ def main() -> None:
             if event:
                 typed.append(event.letter)
                 shown = (event.letter, event.dynamic)
+                if not args.no_tts:
+                    tts.say_label(event.letter)  # no bloquea el video
 
             now = time.monotonic()
             fps = 0.9 * fps + 0.1 / max(now - prev_time, 1e-6)

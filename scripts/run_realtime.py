@@ -12,7 +12,6 @@ import argparse
 import asyncio
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -56,8 +55,7 @@ async def run(args) -> None:
     if not args.no_tts:
         from src.inference import tts
 
-        executor = ThreadPoolExecutor(max_workers=1)  # la voz no debe bloquear la lectura BLE
-        speaker = lambda text: executor.submit(tts.speak, text)  # noqa: E731
+        speaker = tts.say_label  # no bloquea la lectura BLE; voz es-MX (ver config/settings.py)
 
     last_pred_sent = 0.0
 
@@ -80,7 +78,7 @@ async def run(args) -> None:
                 broadcaster.send({"type": "sign", "label": event.label,
                                   "confidence": round(event.confidence, 3), "t_ms": event.t_ms})
             if speaker:
-                speaker(event.label.replace("_", " "))
+                speaker(event.label)
 
     try:
         if args.replay:
