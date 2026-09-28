@@ -4,7 +4,7 @@
 habla, solo se conserva el más reciente para que la voz no se atrase respecto a
 las señas.
 
-- macOS: comando `say` con config.TTS_VOICE (Paulina, es_MX).
+- macOS: comando `say` con settings.TTS_VOICE (Paulina, es_MX).
 - Windows/Linux: pyttsx3 con la primera voz es-MX / es-419 / es que encuentre.
 """
 
@@ -12,7 +12,7 @@ import subprocess
 import sys
 import threading
 
-from shared import config
+from config import settings
 
 _cond = threading.Condition()
 _pending = None  # último texto sin decir
@@ -21,12 +21,12 @@ _worker = None
 
 
 def label_to_text(label: str) -> str:
-    return config.SPOKEN_TEXT.get(label.lower(), label.replace("_", " "))
+    return settings.SPOKEN_TEXT.get(label.lower(), label.replace("_", " "))
 
 
 def say_label(label: str) -> None:
-    """Dice una etiqueta del modelo (omite las de SILENT_LABELS)."""
-    if label.lower() in config.SILENT_LABELS:
+    """Dice una etiqueta del modelo (omite las de NON_SIGN_LABELS, p. ej. reposo)."""
+    if label.lower() in settings.NON_SIGN_LABELS:
         return
     speak(label_to_text(label))
 
@@ -64,7 +64,7 @@ def _run() -> None:
 
 
 def _say_macos(text: str) -> None:
-    subprocess.run(["say", "-v", config.TTS_VOICE, "-r", str(config.TTS_RATE), text], check=True)
+    subprocess.run(["say", "-v", settings.TTS_VOICE, "-r", str(settings.TTS_RATE), text], check=True)
 
 
 def _make_pyttsx3_say():
@@ -72,7 +72,7 @@ def _make_pyttsx3_say():
     import pyttsx3
 
     engine = pyttsx3.init()
-    engine.setProperty("rate", config.TTS_RATE)
+    engine.setProperty("rate", settings.TTS_RATE)
     voice = _pick_spanish_voice(engine.getProperty("voices"))
     if voice:
         engine.setProperty("voice", voice.id)
@@ -91,7 +91,7 @@ def _pick_spanish_voice(voices):
         langs = [x.decode(errors="ignore") if isinstance(x, bytes) else str(x) for x in (v.languages or [])]
         return " ".join([v.id, v.name or ""] + langs).lower().replace("_", "-")
 
-    wanted = config.TTS_LANG.lower().replace("_", "-")
+    wanted = settings.TTS_LANG.lower().replace("_", "-")
     for preference in (wanted, "es-419", "es-"):
         for v in voices:
             if preference in tags(v) or (preference == "es-" and "spanish" in tags(v)):

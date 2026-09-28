@@ -23,11 +23,11 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 
-from shared import config  # noqa: E402
-from src import vision_features  # noqa: E402
-from src.vision import HandTracker  # noqa: E402
+from config import settings  # noqa: E402
+from src.vision import features as vision_features  # noqa: E402
+from src.vision.tracker import HandTracker  # noqa: E402
 
-VISION_DATA_DIR = config.ROOT_DIR / "data" / "vision"
+VISION_DATA_DIR = settings.VISION_DATA_DIR
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
 # MSL-ABC nombra las imágenes S<persona>-<letra>-...jpg
 PARTICIPANT_RE = re.compile(r"^(S\d+)-")

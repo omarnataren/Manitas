@@ -3,6 +3,8 @@ numpy
 scikit-learn
 joblib
 pyttsx3
+websockets
+tensorflow
 opencv-python
 # 1.0.x truena al crear HandLandmarker en macOS ("graph_service ... Service is unavailable")
 mediapipe==0.10.35
