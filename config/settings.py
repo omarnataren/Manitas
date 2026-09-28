@@ -48,6 +48,13 @@ WS_PORT = 8765
 ROOT_DIR = Path(__file__).resolve().parent.parent
 RAW_DIR = ROOT_DIR / "data" / "raw"  # data/raw/<persona>/<seña>/<sample_id>/glove.csv
 PROCESSED_DIR = ROOT_DIR / "data" / "processed"
-VISION_DATA_DIR = ROOT_DIR / "data" / "vision"
+VISION_DATA_DIR = ROOT_DIR / "data" / "vision"  # letras estáticas: un cuadro por fila
+VISION_DYNAMIC_DIR = ROOT_DIR / "data" / "vision_dynamic"  # letras con movimiento: un CSV por video
 MODELS_DIR = ROOT_DIR / "models"
+
+# Mano con la que se hacen las señas frente a la cámara. MediaPipe a veces confunde derecha e
+# izquierda (sobre todo de perfil o con el dorso a la cámara) y eso espeja los puntos y la
+# trayectoria: la J o la Z salen al revés. En vivo se usa este valor en vez de su adivinanza.
+# "auto" = confiar en MediaPipe.
+SIGNING_HAND = "derecha"  # "derecha", "izquierda" o "auto"
 EXPERIMENTS_DIR = ROOT_DIR / "experiments"

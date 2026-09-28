@@ -12,6 +12,7 @@ env/
 data/raw/*
 !data/raw/.gitkeep
 data/vision/
+data/vision_dynamic/
 data/external/
 data/processed/
 

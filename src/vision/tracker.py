@@ -36,14 +36,20 @@ class HandTracker:
     """Detecta una mano por cuadro y devuelve sus 21 puntos (x, y, z).
 
     images=True es para fotos sueltas (datasets); por defecto es modo video (webcam).
+    min_confidence más bajo detecta manos difíciles (p. ej. con guante), con más falsos positivos.
+    hand: "derecha"/"izquierda" fija la mano (en vivo, settings.SIGNING_HAND); "auto" usa la de MediaPipe.
     """
 
-    def __init__(self, images: bool = False):
+    def __init__(self, images: bool = False, min_confidence: float = 0.5, hand: str = "auto"):
         self._images = images
+        self._hand = hand
         options = vision.HandLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=str(ensure_model())),
             running_mode=vision.RunningMode.IMAGE if images else vision.RunningMode.VIDEO,
             num_hands=1,
+            min_hand_detection_confidence=min_confidence,
+            min_hand_presence_confidence=min_confidence,
+            min_tracking_confidence=min_confidence,
         )
         self._landmarker = vision.HandLandmarker.create_from_options(options)
 
@@ -57,11 +63,30 @@ class HandTracker:
         if not result.hand_landmarks:
             return None
         pts = np.array([[p.x, p.y, p.z] for p in result.hand_landmarks[0]])
-        is_left = result.handedness[0][0].category_name == "Left"
+        if self._hand == "auto":
+            is_left = result.handedness[0][0].category_name == "Left"
+        else:
+            is_left = self._hand == "izquierda"
         return pts, is_left
 
     def close(self) -> None:
         self._landmarker.close()
+
+
+ENHANCE_MODES = ["ninguno", "contraste", "aclarar", "ambos"]
+_CLAHE = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+_GAMMA_LUT = np.array([255 * (i / 255) ** 0.6 for i in range(256)], dtype=np.uint8)
+
+
+def enhance(frame: np.ndarray, mode: str) -> np.ndarray:
+    """Realce para manos oscuras (guante negro): contraste local (CLAHE) y/o aclarar sombras (gamma)."""
+    if mode in ("aclarar", "ambos"):
+        frame = cv2.LUT(frame, _GAMMA_LUT)
+    if mode in ("contraste", "ambos"):
+        lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        lab[:, :, 0] = _CLAHE.apply(lab[:, :, 0])
+        frame = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    return frame
 
 
 def draw_hand(frame: np.ndarray, pts: np.ndarray) -> None:

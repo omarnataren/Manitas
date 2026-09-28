@@ -70,7 +70,8 @@ scripts/
   train_cnn_bigru.py         # entrenar CNN + BiGRU
   evaluate_models.py         # comparar modelos sobre el mismo test
   run_realtime.py            # reconocimiento en vivo (o --replay sin guante)
-  vision_demo.py, vision_teacher.py, import_image_dataset.py   # visión artificial
+  vision_demo.py, vision_teacher.py, vision_dynamic.py,
+  import_image_dataset.py, import_video_dataset.py             # visión artificial
 
 data/raw/<persona>/<seña>/<sample_id>/   # glove.csv + metadata.json (no se versiona)
 data/processed/                          # ventanas listas para entrenar (se regenera)
@@ -173,14 +174,79 @@ Resultado con ~50,000 imágenes (40 por persona, letra y grupo), evaluando con p
 
 Features (96 por cuadro): coordenadas normalizadas, distancias entre puntas de dedos, distancias del pulgar a los otros dedos, ángulos de flexión por articulación y un indicador de índice y medio cruzados.
 
-### Datos para letras con movimiento (pendiente)
+### Letras con movimiento (J, K, Ñ, Q, X, Z)
 
-Las letras dinámicas (J, K, Ñ, Q, X, Z) están en un dataset aparte, de los mismos autores y el mismo artículo:
+Una sola foto no basta para estas letras: el modelo mira los últimos 2 s de la mano. La secuencia se remuestrea por tiempo a 15 cuadros/s (da igual si la cámara va a 30 o 60 fps) y se resume en la forma de la mano al inicio, medio y final, cuánto cambia y la trayectoria de la muñeca. Además de las 6 letras aprende dos clases negativas (`estatica` y `transicion`), generadas a partir de las fotos de MSL-ABC, para no confundir cualquier movimiento con una letra.
+
+```
+src/vision/sequence.py            # remuestreo, ventanas, features y DynamicLetterDetector (en vivo)
+src/vision/teacher_data.py        # carga las fotos estáticas para generar los negativos
+scripts/import_video_dataset.py   # videos -> secuencias de puntos (data/vision_dynamic/)
+scripts/vision_dynamic.py         # entrena y evalúa por persona -> models/vision/dynamic.pkl
+```
+
+**Datos: MSL dynamic signs**, de los mismos autores y el mismo artículo que MSL-ABC:
 - Descarga: https://doi.org/10.5281/zenodo.14689869
-- Contenido: 1,200 videos MP4 (1280×720, 30 fps, ~1.8 s cada uno), 20 personas, 5 repeticiones por letra, vista frontal y de perfil (45°). Dos archivos: ~2.2 GB frontal y ~1.4 GB perfil.
+- Contenido: videos MP4 (900×900, 60 fps, mediana 1.8 s), 20 personas, 5 repeticiones por letra, vista frontal y de perfil (45°). Dos archivos: ~2.2 GB frontal y ~1.4 GB perfil. Se usa solo la frontal (621 videos), que es como ve la webcam.
 - Licencia: CC-BY 4.0.
 
-Todavía no se usa: requiere un modelo secuencial y un importador de video.
+```bash
+# 1. Descomprimir el .7z frontal (en cualquier carpeta)
+7zz x MSL-dynamic-signs-frontal-view.7z
+# 2. Extraer los puntos de la mano de cada video (~10 min)
+python scripts/import_video_dataset.py ~/Downloads/MSL-dynamic-signs --name msl-dyn --view frontal
+# 3. Entrenar (necesita también data/vision de MSL-ABC para los negativos)
+python scripts/vision_dynamic.py train --compare
+# 4. El demo usa el modelo automáticamente: las letras con movimiento salen en naranja
+python scripts/vision_demo.py
+```
+
+Resultado evaluando con personas que el modelo no vio: **93% (± 3%)** por ventana con Random Forest (Extra Trees 93%, SVM 92%, MLP 91%). Pasando los 60 videos de test por el demo completo: 51/60 bien; los fallos son casi siempre "no detectó nada" en lugar de otra letra. Ventana probada: 1.5 s → 94%, 2.0 s → 96%, 2.5 s → 97% (con los negativos anteriores); se eligió 2.0 s por estar cerca de la duración típica de la seña.
+
+Los negativos incluyen la forma inicial y final de cada letra con movimiento sostenida sin moverse: sin eso, una mano quieta con forma de X se confundía con la X.
+
+**Con tu cámara:** el dataset es de otras personas y otra cámara. Si en vivo no detecta bien, graba repeticiones propias; se suman al entrenamiento con 3 veces más peso:
+
+```bash
+python scripts/vision_dynamic.py collect --label J --person omar      # 10-15 por letra; ESPACIO empieza/termina, D descarta
+python scripts/vision_dynamic.py collect --label transicion --person omar
+python scripts/vision_dynamic.py collect --label estatica --person omar
+python scripts/vision_dynamic.py check    # antes de reentrenar: qué detecta hoy en cada grabación
+python scripts/vision_dynamic.py train
+```
+
+**Ciclo rápido (examen en vivo):** `quiz` pide letras al azar, dice si el detector acertó (mismo detector y máquina de estados que el demo) y guarda cada intento como grabación propia con la letra pedida. Probar y juntar datos es lo mismo; reentrenar tarda ~6 s.
+
+```bash
+python scripts/vision_dynamic.py quiz --person omar                    # 6 letras x 3 intentos; D descarta el último si lo hiciste mal
+python scripts/vision_dynamic.py train                                 # aprende los intentos
+python scripts/vision_dynamic.py quiz --person omar                    # ¿subió el %?
+python scripts/vision_dynamic.py quiz --person omar --letters Q X transicion --rounds 5   # enfocarse en las que fallan
+python scripts/vision_dynamic.py quiz --person omar --no-save          # medición final sin tocar los datos
+```
+
+Cada examen se agrega a `experiments/quiz_log.csv` (fecha, fecha del modelo, letra pedida, confirmada, segundos) para comparar entre entrenamientos. `transicion` pide mover la mano sin hacer letra; acierta si no se confirma nada (mide falsos positivos). Con guante: `--min-conf 0.3 --enhance ambos`.
+
+Para probar sin webcam: `python scripts/vision_demo.py --video ~/Downloads/MSL-dynamic-signs/test` (o un video tuyo).
+
+### Cuándo se confirma una letra en el demo
+
+`src/vision/letter_state.py` decide cuándo una predicción cuenta, para que no sea instantáneo:
+
+| Seña | Se confirma cuando | Tiempo |
+|---|---|---|
+| Letra estática | La mano está quieta y la misma letra aparece en ≥80% de los cuadros | Sostenerla 0.7 s (barra de progreso) |
+| Letra con movimiento | Durante el gesto el detector vota (confianza ≥70%); al detenerse la mano 0.2 s gana la letra con más votos. 4 votos seguidos iguales confirman sin esperar | Al terminar el gesto, ~0.2–0.5 s después |
+| Siguiente letra | Mínimo 0.5 s después de la anterior | — |
+
+- Con la mano en movimiento no se confirman letras estáticas (la J empieza como I).
+- La misma letra estática no se repite hasta mover la mano o sacarla de cuadro; otra letra distinta sí.
+- Tras una letra con movimiento, queda bloqueado hasta que el detector deja de verla: no se repite y su forma final (la Z termina como D) no cuenta como estática.
+- Si haces una pausa de más de 0.7 s en la forma inicial de una letra con movimiento, esa forma se confirma como su propia letra (p. ej. I antes de la J). Hazlas de corrido.
+
+Los umbrales están al inicio de `letter_state.py` (`STATIC_HOLD_MS`, `MOTION_THRESHOLD`, etc.); el panel muestra el estado y el movimiento en palmas/s para calibrarlos.
+
+Limitación: los negativos (`estatica`, `transicion`) son sintéticos; con movimientos reales entre letras puede haber falsos positivos. Si pasa, graba `transicion` y `estatica` reales con `vision_dynamic.py collect`.
 
 ## Estado actual
 
@@ -190,6 +256,7 @@ Todavía no se usa: requiere un modelo secuencial y un importador de video.
 - [x] Random Forest y CNN + BiGRU implementados (probados con datos sintéticos)
 - [x] Tiempo real con máquina de estados, voz y WebSocket (probado con `--replay`)
 - [x] Maestro de visión (MediaPipe) entrenado con MSL-ABC: 21 letras estáticas, 95%
+- [x] Letras con movimiento (J, K, Ñ, Q, X, Z) con la cámara: 96%
 - [ ] Definir lista final de señas (`config/settings.py`)
 - [ ] Grabar dataset real con el guante (varias personas, incluyendo `reposo` y `transicion`)
 - [ ] Confirmar la frecuencia real del guante (`SAMPLE_RATE_HZ`)

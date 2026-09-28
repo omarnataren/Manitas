@@ -23,18 +23,13 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
-from sklearn.calibration import CalibratedClassifierCV  # noqa: E402
-from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier  # noqa: E402
 from sklearn.metrics import classification_report  # noqa: E402
 from sklearn.model_selection import StratifiedGroupKFold, cross_val_score  # noqa: E402
-from sklearn.neural_network import MLPClassifier  # noqa: E402
-from sklearn.pipeline import make_pipeline  # noqa: E402
-from sklearn.preprocessing import LabelEncoder, StandardScaler  # noqa: E402
-from sklearn.svm import SVC  # noqa: E402
+from sklearn.preprocessing import LabelEncoder  # noqa: E402
 
 from config import settings  # noqa: E402
 from src.vision import features as vision_features  # noqa: E402
-from src.vision.classifier import SignClassifier  # noqa: E402
+from src.vision.classifier import BACKENDS, SignClassifier, make_backend  # noqa: E402
 from src.vision.tracker import HandTracker, draw_hand, should_quit  # noqa: E402
 
 WINDOW = "Manitas - vision"
@@ -45,27 +40,6 @@ HEADER = vision_features.CSV_HEADER
 
 CONFIDENCE_THRESHOLD = 0.6
 VOTE_FRAMES = 8
-BACKENDS = ["rf", "et", "mlp", "svm"]
-
-
-def make_backend(name: str, with_proba: bool = True):
-    if name == "rf":
-        return RandomForestClassifier(n_estimators=200, n_jobs=-1, random_state=42)
-    if name == "et":
-        return ExtraTreesClassifier(n_estimators=300, n_jobs=-1, random_state=42)
-    if name == "mlp":
-        return make_pipeline(
-            StandardScaler(),
-            MLPClassifier(hidden_layer_sizes=(256, 128), early_stopping=True, max_iter=300, random_state=42),
-        )
-    if name == "svm":
-        svc = SVC(C=10, gamma="scale", random_state=42)
-        # La calibración (para tener confianza por letra) hace el entrenamiento ~5x más lento;
-        # solo se activa para el modelo final.
-        return make_pipeline(StandardScaler(), CalibratedClassifierCV(svc, ensemble=False) if with_proba else svc)
-    raise ValueError(f"Modelo desconocido: {name}")
-
-
 def open_camera(index: int) -> cv2.VideoCapture:
     cap = cv2.VideoCapture(index)
     if not cap.isOpened():
@@ -97,7 +71,7 @@ def put_text(frame, text: str, y: int, color=(255, 255, 255), scale: float = 0.8
 def collect(label: str, camera: int) -> None:
     out_dir = VISION_DATA_DIR / label
     out_dir.mkdir(parents=True, exist_ok=True)
-    tracker, cap = HandTracker(), open_camera(camera)
+    tracker, cap = HandTracker(hand=settings.SIGNING_HAND), open_camera(camera)
     f, writer, path, n = None, None, None, 0
 
     def stop_recording():
@@ -232,7 +206,7 @@ def live(camera: int) -> None:
     if not MODEL_PATH.exists():
         sys.exit("No hay modelo. Corre primero: vision_teacher.py train")
     clf = SignClassifier.load(MODEL_PATH)
-    tracker, cap = HandTracker(), open_camera(camera)
+    tracker, cap = HandTracker(hand=settings.SIGNING_HAND), open_camera(camera)
     recent: deque = deque(maxlen=VOTE_FRAMES)
 
     try:

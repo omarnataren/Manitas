@@ -2,8 +2,33 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.svm import SVC
+
+
+BACKENDS = ["rf", "et", "mlp", "svm"]
+
+
+def make_backend(name: str, with_proba: bool = True):
+    if name == "rf":
+        return RandomForestClassifier(n_estimators=200, n_jobs=-1, random_state=42)
+    if name == "et":
+        return ExtraTreesClassifier(n_estimators=300, n_jobs=-1, random_state=42)
+    if name == "mlp":
+        return make_pipeline(
+            StandardScaler(),
+            MLPClassifier(hidden_layer_sizes=(256, 128), early_stopping=True, max_iter=300, random_state=42),
+        )
+    if name == "svm":
+        svc = SVC(C=10, gamma="scale", random_state=42)
+        # La calibración (para tener confianza por letra) hace el entrenamiento ~5x más lento;
+        # solo se activa para el modelo final.
+        return make_pipeline(StandardScaler(), CalibratedClassifierCV(svc, ensemble=False) if with_proba else svc)
+    raise ValueError(f"Modelo desconocido: {name}")
 
 
 class SignClassifier:
